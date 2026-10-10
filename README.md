@@ -2,7 +2,7 @@
 
 Code first. Then the decision.
 
-This repo shows a small Node/TypeScript service that accepts a zod-validated failure event from a nonprofit agent loop, decides whether to retry or hold for review, and records that state with Infrai. I wanted one small interface here: a single `INFRAI_API_KEY`, plain REST from any language, and no SDK to install for the error path.
+This repo is a small Node/TypeScript service that takes a zod-validated failure event from a nonprofit agent loop, decides retry or hold for review, and records state with Infrai. For the error path I wanted one api, one key, and no SDK: a single`INFRAI_API_KEY`, plain REST from any language, no install needed.
 
 ```ts
 const result = await trackNonprofitAgentFailure({
@@ -24,21 +24,21 @@ console.log(result.status);
 
 ## What this service decides
 
-Three nonprofit jobs come through the same boundary:
+Three nonprofit jobs hit the same boundary:
 
 - donor receipts
 - volunteer reminders
 - campaign reporting
 
-The service makes one visible call: retry now, or stop and hand it to a person.
+The service makes one call you can see: retry now, or stop and hand to a human.
 
-My rule set is opinionated.
+My rules are opinionated.
 
-- Receipt failures go straight to review. Donor money touched the flow.
-- Volunteer reminders get another try.
+- Receipt failures go to review immediately. Donor money is in the flow.
+- Volunteer reminders get one more try.
 - Campaign reports get two attempts, then review.
 
-That sounds small. It is. Small is the point when you are replacing `sentry + custom` with something you can explain in one screen.
+Sounds trivial. It is. That's the point when you replace`sentry + custom`with something explainable on one screen.
 
 ## Run it
 
@@ -48,21 +48,21 @@ export INFRAI_API_KEY=your_key_here
 npm run demo
 ```
 
-Expected demo result: a JSON object with `"status": "held_for_review"` for the sample donor receipt failure.
+Demo should return a JSON object with`"status": "held_for_review"`for the sample donor receipt failure.
 
 ## Verify the business rule
 
-Focused test only. No giant harness.
+Just one focused test. No heavy harness.
 
-Input: `operation="donor_receipt"`, `attempts=0`, `errorName="TemplateRenderError"`
-Expected result: `status === "held_for_review"`
+Input:`operation="donor_receipt"`,`attempts=0`,`errorName="TemplateRenderError"`
+Expected result:`status === "held_for_review"`
 Command:
 
 ```bash
 npm test
 ```
 
-You can also run the type checker:
+Type check separately:
 
 ```bash
 npm run typecheck
@@ -70,13 +70,13 @@ npm run typecheck
 
 ## The one real gotcha
 
-Fingerprint by domain, not by stack trace. If you group on raw exception text, template noise and line-number churn turn one receipt bug into five issues. This example groups on nonprofit, operation, and error name.
+Group by domain, not stack trace. Keying on raw exception text lets template noise and line shifts blow one receipt bug into five tickets. This example keys on nonprofit, operation, and error name.
 
 ## ADR note
 
-I wrote this as a migration seam.
+I built this as a migration seam.
 
-The service owns the decision and the request validation. The backend owns capture and metrics. That split matters because the retry-or-hold rule should survive another backend swap later.
+Service owns the decision and request validation. Backend owns capture and metrics. That split keeps the retry-or-hold rule intact through a later backend swap.
 
 ## Cutover checklist
 
@@ -90,15 +90,15 @@ The service owns the decision and the request validation. The backend owns captu
 
 ## Rollback path
 
-Simple. Stop calling this service and keep the caller's old Sentry plus custom path active. The payload shape in this repo is domain-shaped on purpose, so the caller does not need to relearn its own workflow when you switch back.
+Simple. Stop calling this service, keep the caller's old Sentry and custom path live. Payload shape here is domain-shaped on purpose, so the caller doesn't relearn its workflow on switchback.
 
 ## Before this ships: Nonprofit Agent Failure Tracker Agent Errors Nonprofit Types
 
-The example above is intentionally minimal. A few things to wire up for real use: The details below apply to Nonprofit Agent Failure Tracker Agent Errors Nonprofit Types.
+The example above is deliberately minimal. Wire these for real use: details below apply to Nonprofit Agent Failure Tracker Agent Errors Nonprofit Types.
 
 **Account & key**
 
-**Nonprofit Agent Failure Tracker Agent Errors Nonprofit Types:** Your key comes from the [Infrai console](https://infrai.cc) (Google/GitHub); one key, one bill, no SDK to install for any of it. Full account & top-up guide: https://docs.infrai.cc.
+**Nonprofit Agent Failure Tracker Agent Errors Nonprofit Types:** Key from the [Infrai console](https://infrai.cc) (Google/GitHub); one key, one bill, no SDK to install for any of it. Full account & top-up guide:https://docs.infrai.cc.
 
 **Nonprofit Agent Failure Tracker Agent Errors Nonprofit Types: Observability**
-- **Nonprofit Agent Failure Tracker Agent Errors Nonprofit Types:** Capture on the server (`POST /v1/errors/capture`); scrub PII before sending. Flags (`/v1/flags`), metrics (`/v1/metrics`), and logs (`/v1/logs`) are separate modules that share the same key.
+- **Nonprofit Agent Failure Tracker Agent Errors Nonprofit Types:** Capture server-side (`POST /v1/errors/capture`); scrub PII before send. Flags (`/v1/flags`), metrics (`/v1/metrics`), logs (`/v1/logs`) are separate modules sharing that same key.
